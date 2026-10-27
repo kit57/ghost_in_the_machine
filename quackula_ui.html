@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quackula Séance Room</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦆</text></svg>">
+<style>
+  :root {
+    --bg: #0c0a10;
+    --panel: #15121b;
+    --panel-2: #1c1824;
+    --line: #2c2636;
+    --text: #e7e2ec;
+    --dim: #918a9c;
+    --duck: #7fe0d6;
+    --mag: #cf7ddb;
+    --red: #ff6473;
+    --yel: #f2c86b;
+    --grn: #84d993;
+    --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+    --serif: "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans);
+    background-image: radial-gradient(ellipse at 50% -10%, #2a1734 0%, transparent 55%);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+
+  /* header */
+  header { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .duck { font: 13px/1.15 var(--mono); color: var(--duck); margin: 0; white-space: pre; text-shadow: 0 0 12px #7fe0d655; }
+  .brand h1 { font: 600 34px/1 var(--serif); letter-spacing: .14em; margin: 0; color: var(--mag); text-shadow: 0 0 18px #cf7ddb66; }
+  .brand p { margin: 6px 0 0; color: var(--dim); font-style: italic; font-family: var(--serif); }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); box-shadow: 0 0 8px currentColor; }
+  .dot.ok { background: var(--grn); color: var(--grn); }
+  .dot.warn { background: var(--yel); color: var(--yel); }
+
+  /* settings */
+  .settings {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-size: 13.5px;
+  }
+  .settings label { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); cursor: pointer; }
+  .settings select, .settings input[type=text] { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--text); }
+  input[type=checkbox] { accent-color: var(--mag); }
+
+  /* tabs */
+  .tabs { display: flex; gap: 4px; margin: 22px 0 0; border-bottom: 1px solid var(--line); }
+  .tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 16px; color: var(--dim); cursor: pointer; font-family: var(--serif); font-size: 17px; }
+  .tab[aria-selected=true] { color: var(--text); border-bottom-color: var(--mag); }
+  .pane { padding-top: 18px; }
+  .pane[hidden] { display: none; }
+
+  /* forms */
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--dim); }
+  .field.grow { flex: 1 1 260px; }
+  .field input { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; color: var(--text); font-family: var(--mono); font-size: 14px; min-width: 0; }
+  .field input:focus, textarea:focus { outline: 2px solid #cf7ddb66; outline-offset: 0; border-color: var(--mag); }
+  .btn {
+    background: linear-gradient(#3a2045, #2a1733); border: 1px solid #5a3368; color: var(--text);
+    border-radius: 8px; padding: 9px 16px; cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--mag); box-shadow: 0 0 14px #cf7ddb44; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.quiet { background: var(--panel-2); border-color: var(--line); font-weight: 500; }
+  .btn.small { padding: 5px 11px; font-size: 13px; }
+
+  .cli { margin-top: 10px; display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--dim); }
+  .cli code { font: 12.5px var(--mono); color: var(--text); background: var(--panel); border: 1px solid var(--line); padding: 4px 8px; border-radius: 6px; overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0; }
+
+  /* scan summary */
+  .summary { margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .stat b { display: block; font: 600 26px/1.1 var(--serif); }
+  .stat span { font-size: 12.5px; color: var(--dim); }
+  .meter { height: 8px; border-radius: 4px; background: var(--panel-2); margin-top: 8px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--mag), var(--red)); box-shadow: 0 0 10px var(--red); transition: width .8s; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--dim); }
+  .chip em { color: var(--mag); font-style: normal; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 20px 0 10px; }
+  .toolbar .field { flex-direction: row; align-items: center; gap: 6px; }
+  .toolbar .field input { width: 64px; padding: 6px 8px; }
+  .spacer { flex: 1; }
+
+  /* curse cards */
+  .curse { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+  .curse.sev3 { border-left: 3px solid var(--red); }
+  .curse.sev2 { border-left: 3px solid var(--mag); }
+  .curse.sev1 { border-left: 3px solid var(--dim); }
+  .curse.done { border-color: #2f4a44; }
+  .curse-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 12px 14px 6px; }
+  .curse-head h3 { margin: 0; font: 600 18px var(--serif); color: var(--red); }
+  .sev { letter-spacing: 2px; font-size: 12px; }
+  .where { font: 12.5px var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+  .curse-head .btn { margin-left: auto; }
+  pre { margin: 0; font: 12.5px/1.5 var(--mono); overflow-x: auto; }
+  .snippet { padding: 8px 14px 12px; color: var(--dim); }
+  .reply { border-top: 1px dashed var(--line); padding: 12px 16px 14px; background: #120f17; }
+  .reply[hidden] { display: none; }
+  .said { color: var(--duck); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .said pre { background: #0b0a0e; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; color: var(--text); white-space: pre; }
+  .note { color: var(--yel); font-size: 13px; margin-bottom: 6px; }
+  .aside { color: var(--dim); font-style: italic; font-size: 13px; margin-top: 10px; }
+  .channeling { color: var(--dim); font-size: 13.5px; animation: breathe 1.6s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .35; } }
+  .chant { font: 600 16px var(--serif); color: var(--red); margin-bottom: 8px; animation: flicker .14s steps(1) infinite; }
+  @keyframes flicker { 0% { color: var(--red); } 33% { color: var(--mag); } 66% { color: #fff; } }
+  .empty { text-align: center; color: var(--dim); padding: 40px 0; font-family: var(--serif); font-style: italic; }
+  .empty.pure { color: var(--grn); }
+  .error { color: var(--red); margin-top: 14px; }
+
+  /* séance chat */
+  .chat { margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; height: min(56vh, 560px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 85%; padding: 9px 13px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.you { align-self: flex-end; background: #23302a; border: 1px solid #35503f; color: #d8f2de; }
+  .msg.duck { align-self: flex-start; background: #121a1c; border: 1px solid #22393a; }
+  .msg.sys { align-self: center; color: var(--dim); font-size: 13px; font-style: italic; background: none; padding: 0; }
+  .composer { display: flex; gap: 10px; margin-top: 10px; align-items: end; }
+  textarea { flex: 1; resize: vertical; min-height: 46px; max-height: 200px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+
+  @media (max-width: 600px) {
+    .duck { display: none; }
+    .status { margin-left: 0; }
+    .msg { max-width: 95%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+<pre class="duck" aria-hidden="true">          __
+      ___( x)>   ~
+      \ &lt;_. )   ~ ~
+  ~~~~ `---'  ~</pre>
+    <div class="brand">
+      <h1 id="title">QUACKULA</h1>
+      <p>the haunted rubber duck</p>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="status-text">summoning…</span></div>
+  </header>
+
+  <div class="settings">
+    <label>Spirit (model)
+      <select id="model"></select>
+    </label>
+    <label title="No model at all; the duck uses its canned ancient wisdom"><input type="checkbox" id="offline"> Offline</label>
+    <label title="Force CPU inference (for old GPU drivers)"><input type="checkbox" id="cpu"> CPU only</label>
+    <label title="Typewriter effect and dramatic chants"><input type="checkbox" id="theatrics" checked> Theatrics</label>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-pane="exorcise">☠ Exorcise</button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="debug">🕯 Séance (debug)</button>
+  </div>
+
+  <!-- EXORCISE -->
+  <section class="pane" id="exorcise">
+    <form class="row" id="scan-form">
+      <div class="field grow">
+        <label for="path">Folder or file to sniff</label>
+        <input id="path" type="text" spellcheck="false" autocomplete="off">
+      </div>
+      <button class="btn" id="scan-btn">Sniff for curses</button>
+    </form>
+    <div class="cli">CLI equivalent <code id="cli-ex"></code><button class="btn quiet small" data-copy="cli-ex">Copy</button></div>
+    <div id="scan-error" class="error" hidden></div>
+    <div id="results"></div>
+  </section>
+
+  <!-- DEBUG -->
+  <section class="pane" id="debug" hidden>
+    <div class="row">
+      <div class="field grow">
+        <label for="file">Let the duck read a file first (optional)</label>
+        <input id="file" type="text" spellcheck="false" autocomplete="off" placeholder="path/to/my_buggy_script.py">
+      </div>
+      <button class="btn quiet" id="reset">New séance</button>
+    </div>
+    <div class="cli">CLI equivalent <code id="cli-db"></code><button class="btn quiet small" data-copy="cli-db">Copy</button></div>
+    <div class="chat" id="chat" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <textarea id="say" rows="2" placeholder="Describe what haunts your code… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <button class="btn" id="send">Speak</button>
+    </form>
+  </section>
+</div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+const GENERIC_CHANTS = [
+  "In nomine Linus, et Guido, et Spiritus Stack Overflow...",
+  "By the power of git blame, I compel thee!",
+  "Quack quack... VADE RETRO!",
+  "Refactorum maximus!",
+  "Legacius codex, return to the void!",
+];
+const AFTERLIFE_ASIDES = [
+  "*The duck stares into the void. The void squeaks back.*",
+  "*Somewhere, a radiator clanks. The duck shudders.*",
+  "*A faint smell of bathwater and ozone fills the room.*",
+  "*The candle flickers. The duck pretends that was intentional.*",
+  "*\"No bathtubs in the beyond,\" the duck mutters. \"Not one.\"*",
+];
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const zalgo = (t, n = 1) => [...t].map(ch => /[a-z]/i.test(ch)
+  ? ch + Array.from({ length: n }, () => String.fromCharCode(0x300 + Math.floor(Math.random() * 0x6f))).join('') : ch).join('');
+
+const state = { defaults: null, scan: null, results: new Map(), busy: false, chat: [] };
+const ui = {
+  model: $('#model'), offline: $('#offline'), cpu: $('#cpu'), theatrics: $('#theatrics'),
+  path: $('#path'), file: $('#file'),
+};
+const store = {
+  get(k) { try { return localStorage.getItem('quackula.' + k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('quackula.' + k, v); } catch {} },
+};
+const theatrics = () => ui.theatrics.checked;
+const opts = () => ({ model: ui.model.value, offline: ui.offline.checked, cpu: ui.cpu.checked });
+
+// ---------------------------------------------------------------- network
+
+async function post(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(e.error || res.statusText);
+  }
+  return res;
+}
+
+async function stream(url, body, onMsg) {
+  const res = await post(url, body);
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i); buf = buf.slice(i + 1);
+      if (line.trim()) onMsg(JSON.parse(line));
+    }
+  }
+}
+
+// ---------------------------------------------------------------- text effects
+
+// Types text into an element; catches up quickly if the model outruns it.
+function typer(el) {
+  let queue = '', text = '', timer = null, onDrained = null;
+  const paint = () => { el.textContent = text; scrollChat(el); };
+  const tick = () => {
+    const n = Math.max(1, Math.ceil(queue.length / 25));
+    text += queue.slice(0, n); queue = queue.slice(n); paint();
+    if (!queue) { clearInterval(timer); timer = null; onDrained && onDrained(); }
+  };
+  return {
+    push(s) {
+      if (!text && !queue) s = s.replace(/^\s+/, '');
+      s = s.replaceAll('**', '');
+      if (!theatrics()) { text += s; paint(); return; }
+      queue += s;
+      if (!timer) timer = setInterval(tick, 14);
+    },
+    finish() { return new Promise(r => { if (!timer) r(); else onDrained = r; }); },
+    get text() { return text; },
+  };
+}
+
+// Plain text with ``` fences -> text nodes + <pre> blocks.
+function renderSaid(el, text) {
+  el.textContent = '';
+  text.trim().split(/```[^\n]*\n?/).forEach((part, i) => {
+    if (i % 2) el.append(h('pre', '', part.replace(/\n$/, '')));
+    else if (part.trim()) el.append(document.createTextNode(part.replace(/^\n+|\n+$/g, i ? '\n' : '')));
+  });
+}
+
+function scrollChat(el) {
+  const chat = el.closest('.chat');
+  if (chat) chat.scrollTop = chat.scrollHeight;
+}
+
+// ---------------------------------------------------------------- status & settings
+
+async function refreshStatus() {
+  const dot = $('#dot'), txt = $('#status-text');
+  if (ui.offline.checked) { dot.className = 'dot warn'; txt.textContent = 'offline: canned ancient wisdom'; return; }
+  try {
+    const s = await (await fetch('/api/status?model=' + encodeURIComponent(ui.model.value || ''))).json();
+    if (!state.defaults) init(s);
+    const keep = ui.model.value;
+    const names = [...new Set([...s.models, keep].filter(Boolean))];
+    ui.model.replaceChildren(...names.map(n => new Option(n, n)));
+    ui.model.value = keep;
+    dot.className = 'dot ' + (s.problem ? 'warn' : 'ok');
+    txt.textContent = s.problem || `the spirit of ${ui.model.value} is listening`;
+  } catch {
+    dot.className = 'dot'; txt.textContent = 'the séance server is gone (restart quackula.py ui)';
+  }
+}
+
+function init(s) {
+  state.defaults = s;
+  ui.model.append(new Option(store.get('model') || s.model));
+  ui.model.value = store.get('model') || s.model;
+  ui.offline.checked = s.offline;
+  ui.cpu.checked = s.cpu;
+  ui.theatrics.checked = s.fast ? false : store.get('theatrics') !== '0';
+  ui.path.value = store.get('path') || s.path;
+  ui.file.value = store.get('file') || '';
+  updateCli();
+}
+
+function q(s) { return /[\s"']/.test(s) ? `"${s.replaceAll('"', '\\"')}"` : s; }
+function flags() {
+  const f = [];
+  if (state.defaults && ui.model.value !== state.defaults.model) f.push('--model', q(ui.model.value));
+  if (!theatrics()) f.push('--fast');
+  if (ui.offline.checked) f.push('--offline');
+  if (ui.cpu.checked) f.push('--cpu');
+  return f;
+}
+function updateCli() {
+  const max = $('#max') ? $('#max').value : 5;
+  $('#cli-ex').textContent = ['python quackula.py exorcise', q(ui.path.value || '.'),
+    ...(String(max) !== '5' ? ['--max', max] : []), ...flags()].join(' ');
+  $('#cli-db').textContent = ['python quackula.py debug',
+    ...(ui.file.value.trim() ? ['--file', q(ui.file.value.trim())] : []), ...flags().filter(f => f !== '--offline')].join(' ');
+}
+
+ui.model.addEventListener('change', () => { store.set('model', ui.model.value); refreshStatus(); updateCli(); });
+ui.offline.addEventListener('change', () => { refreshStatus(); updateCli(); updateChatAvailability(); });
+ui.cpu.addEventListener('change', updateCli);
+ui.theatrics.addEventListener('change', () => { store.set('theatrics', theatrics() ? '1' : '0'); updateCli(); });
+ui.path.addEventListener('input', () => { store.set('path', ui.path.value); updateCli(); });
+ui.file.addEventListener('input', () => { store.set('file', ui.file.value); updateCli(); });
+
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('#' + b.dataset.copy).textContent); b.textContent = 'Copied'; }
+  catch { b.textContent = 'Select & copy'; }
+  setTimeout(() => (b.textContent = 'Copy'), 1400);
+}));
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(o => o.setAttribute('aria-selected', o === t));
+  document.querySelectorAll('.pane').forEach(p => (p.hidden = p.id !== t.dataset.pane));
+  if (t.dataset.pane === 'debug') $('#say').focus();
+}));
+
+// Flicker the title now and then, like the CLI's zalgo banner.
+setInterval(() => {
+  if (!theatrics() || Math.random() > .3) return;
+  const t = $('#title'); t.textContent = zalgo('QUACKULA');
+  setTimeout(() => (t.textContent = 'QUACKULA'), 160);
+}, 2500);
+
+// ---------------------------------------------------------------- exorcise
+
+function setBusy(b) {
+  state.busy = b;
+  document.querySelectorAll('#exorcise .btn:not([data-copy])').forEach(btn => {
+    if (btn.id !== 'report') btn.disabled = b;
+  });
+  const rep = $('#report'); if (rep) rep.disabled = b || !state.results.size;
+}
+
+$('#scan-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (state.busy) return;
+  const err = $('#scan-error'), out = $('#results');
+  err.hidden = true;
+  setBusy(true);
+  out.replaceChildren(h('p', 'channeling', `Sniffing ${ui.path.value || '.'} for curses…`));
+  try {
+    if (theatrics()) await sleep(900);
+    state.scan = await (await post('/api/scan', { path: ui.path.value })).json();
+    state.results.clear();
+    renderScan();
+  } catch (ex) {
+    out.replaceChildren(); err.textContent = ex.message; err.hidden = false;
+  } finally { setBusy(false); }
+});
+
+function renderScan() {
+  const s = state.scan, out = $('#results');
+  out.replaceChildren();
+  if (!s.curses.length) {
+    out.append(h('p', 'empty pure', '…nothing. This code is pure. Suspiciously pure. The duck will be watching.'));
+    return;
+  }
+  const summary = h('div', 'summary');
+  const stat = (b, span) => { const d = h('div', 'stat'); d.append(h('b', '', b), h('span', '', span)); return d; };
+  const lvl = stat(s.level + '%', 'possession level');
+  const meter = h('div', 'meter'), bar = h('i'); bar.style.width = '0%'; meter.append(bar); lvl.append(meter);
+  summary.append(stat(s.files, 'files sniffed'), stat(s.curses.length, 'curses detected'), lvl);
+  requestAnimationFrame(() => requestAnimationFrame(() => (bar.style.width = s.level + '%')));
+
+  const kinds = h('div', 'kinds');
+  s.counts.forEach(c => { const chip = h('span', 'chip', `☠ ${c.title} `); chip.append(h('em', '', '×' + c.n)); kinds.append(chip); });
+
+  const bar2 = h('div', 'toolbar');
+  const maxField = h('label', 'field', 'Exorcise the worst');
+  const max = h('input'); max.id = 'max'; max.type = 'number'; max.min = 1; max.max = s.curses.length;
+  max.value = Math.min(Number(store.get('max')) || 5, s.curses.length);
+  max.addEventListener('input', () => { store.set('max', max.value); updateCli(); });
+  maxField.append(max);
+  const runAll = h('button', 'btn', 'Perform the ritual');
+  runAll.addEventListener('click', () => ritual(Number(max.value) || 5));
+  const report = h('button', 'btn quiet', '📜 Download report'); report.id = 'report'; report.disabled = true;
+  report.addEventListener('click', downloadReport);
+  bar2.append(maxField, runAll, h('span', 'spacer'), report);
+
+  out.append(summary, kinds, bar2);
+  s.curses.forEach(c => out.append(curseCard(c)));
+  updateCli();
+}
+
+function curseCard(c) {
+  const card = h('article', 'curse sev' + c.severity); card.id = 'curse-' + c.id;
+  const head = h('div', 'curse-head');
+  head.append(h('h3', '', c.title), h('span', 'sev', '☠'.repeat(c.severity)),
+    h('span', 'where', `${c.rel}:${c.line}${c.note ? ' — ' + c.note : ''}`));
+  const btn = h('button', 'btn small', 'Exorcise');
+  btn.addEventListener('click', async () => { setBusy(true); try { await exorcise(c); } finally { setBusy(false); } });
+  head.append(btn);
+  const reply = h('div', 'reply'); reply.hidden = true;
+  card.append(head, h('pre', 'snippet', c.snippet), reply);
+  return card;
+}
+
+async function exorcise(c) {
+  const card = $('#curse-' + c.id), reply = $('.reply', card);
+  reply.hidden = false; reply.replaceChildren();
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (theatrics()) {
+    const words = '🕯 ' + pick([c.chant, c.chant, ...GENERIC_CHANTS]);
+    const chant = h('div', 'chant', words);
+    reply.append(chant);
+    for (let i = 0; i < 8; i++) { chant.textContent = i % 2 ? zalgo(words) : words; await sleep(130); }
+    chant.textContent = words;
+    chant.style.animation = 'none';
+  }
+  const waiting = h('div', 'channeling', '🕯 the duck is channeling…');
+  const said = h('div', 'said');
+  reply.append(waiting, said);
+  const t = typer(said);
+  let full = '';
+  try {
+    await stream('/api/cure', { curse: c, ...opts() }, m => {
+      if (m.warn) reply.insertBefore(h('div', 'note', '⚠ ' + m.warn + (m.offline ? ' The duck relies on its ancient memory instead.' : '')), waiting);
+      if (m.t) { waiting.remove(); full += m.t; t.push(m.t); }
+    });
+  } catch (ex) {
+    waiting.remove(); reply.append(h('div', 'note', '⚠ ' + ex.message)); return;
+  }
+  await t.finish();
+  waiting.remove();
+  renderSaid(said, full.replaceAll('**', ''));
+  state.results.set(c.id, full.trim());
+  card.classList.add('done');
+  if (Math.random() < .35) reply.append(h('div', 'aside', pick(AFTERLIFE_ASIDES)));
+}
+
+async function ritual(n) {
+  setBusy(true);
+  try {
+    for (const c of state.scan.curses.slice(0, n)) {
+      await exorcise(c);
+      if (theatrics()) await sleep(500);
+    }
+  } finally { setBusy(false); }
+}
+
+async function downloadReport() {
+  const s = state.scan;
+  const entries = s.curses.filter(c => state.results.has(c.id)).map(c => ({ curse: c, text: state.results.get(c.id) }));
+  try {
+    const md = await (await post('/api/report', { name: s.name, files: s.files, total: s.curses.length, level: s.level, entries })).text();
+    const a = h('a'); a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
+    a.download = 'exorcism.md'; a.click(); URL.revokeObjectURL(a.href);
+  } catch (ex) { alert(ex.message); }
+}
+
+// ---------------------------------------------------------------- séance
+
+const chat = $('#chat'), say = $('#say');
+
+function bubble(cls, text) { const b = h('div', 'msg ' + cls, text); chat.append(b); chat.scrollTop = chat.scrollHeight; return b; }
+
+function resetSeance() {
+  state.chat = [];
+  chat.replaceChildren();
+  bubble('duck', 'Ah. A mortal with a bug. Sit. Speak. The duck is listening.');
+  updateChatAvailability();
+}
+
+function updateChatAvailability() {
+  const off = ui.offline.checked;
+  $('#send').disabled = off || state.chatBusy;
+  say.disabled = off;
+  say.placeholder = off ? 'The duck cannot listen offline. It needs a local model.'
+    : 'Describe what haunts your code… (Enter to send, Shift+Enter for a new line)';
+}
+
+$('#reset').addEventListener('click', resetSeance);
+say.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#composer').requestSubmit(); }
+});
+
+$('#composer').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = say.value.trim();
+  if (!text || state.chatBusy || ui.offline.checked) return;
+  if (['exit', 'quit', 'bye'].includes(text.toLowerCase())) {
+    say.value = '';
+    bubble('sys', 'The duck sinks back into the bathwater. It will return when you least expect it.');
+    state.chat = [];
+    return;
+  }
+  say.value = '';
+  bubble('you', text);
+  state.chat.push({ role: 'user', content: text });
+  state.chatBusy = true; updateChatAvailability();
+
+  const duck = bubble('duck', '');
+  const waiting = h('span', 'channeling', '🕯 the duck is channeling…'); duck.append(waiting);
+  const said = h('span', 'said'); duck.append(said);
+  const t = typer(said);
+  let full = '', failed = null;
+  try {
+    await stream('/api/chat', { messages: state.chat, file: ui.file.value.trim(), ...opts() }, m => {
+      if (m.warn) { if (/broke/.test(m.warn)) failed = m.warn; else duck.before(h('div', 'msg sys', '⚠ ' + m.warn)); }
+      if (m.t) { waiting.remove(); full += m.t; t.push(m.t); }
+    });
+  } catch (ex) { failed = ex.message; }
+  await t.finish();
+  waiting.remove();
+  if (failed || !full.trim()) {
+    duck.remove();
+    bubble('sys', '⚠ ' + (failed || 'The spirit said nothing.'));
+    state.chat.pop();  // like the CLI: forget the unanswered question
+  } else {
+    renderSaid(said, full.replaceAll('**', ''));
+    state.chat.push({ role: 'assistant', content: full.trim() });
+  }
+  state.chatBusy = false; updateChatAvailability();
+  say.focus();
+});
+
+resetSeance();
+refreshStatus();
+setInterval(refreshStatus, 15000);
+</script>
+</body>
+</html>

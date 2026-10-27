@@ -11,6 +11,7 @@ curse and how to lift it. Your code never leaves your machine.
 Usage:
     python quackula.py exorcise [PATH] [--max N] [--report FILE]
     python quackula.py debug [--file FILE]
+    python quackula.py ui [PATH] [--port N] [--no-browser]
 
 Options for both: --model NAME (default gemma3:4b), --fast, --offline
 Stdlib only. Needs Ollama running locally (falls back to canned wisdom if not).
@@ -433,8 +434,10 @@ def summon(model):
     return None
 
 
-def channel(messages, model):
-    """Stream a reply from the local model, typewriter style. Returns the text."""
+def open_channel(messages, model, warn=None):
+    """Start streaming a reply from the local model. Returns an iterator of tokens.
+
+    warn(text) is called if the GPU backend crashes and we switch to the CPU."""
     global CPU_ONLY
     options = {"temperature": 0.6}
     if CPU_ONLY:
@@ -443,10 +446,6 @@ def channel(messages, model):
                        "options": options}).encode()
     req = urllib.request.Request(f"{OLLAMA}/api/chat", data=body,
                                  headers={"Content-Type": "application/json"})
-    waiting = "  🕯  the duck is channeling..."
-    if TTY:
-        sys.stdout.write(f"{C.DIM}{waiting}{C.R}")
-        sys.stdout.flush()
     try:
         resp = urllib.request.urlopen(req, timeout=300)
     except urllib.error.HTTPError as e:
@@ -455,12 +454,14 @@ def channel(messages, model):
             raise RuntimeError(detail or str(e)) from e
         # Old GPU drivers crash Ollama's CUDA backend; the CPU still works.
         CPU_ONLY = True
-        if TTY:
-            sys.stdout.write("\r\033[K")
-        print(f"  {C.YEL}⚠ The GPU spirits refuse to cooperate. "
-              f"Channeling through the CPU instead (slower).{C.R}")
-        return channel(messages, model)
-    out, first = [], True
+        if warn:
+            warn("The GPU spirits refuse to cooperate. "
+                 "Channeling through the CPU instead (slower).")
+        return open_channel(messages, model, warn)
+    return read_tokens(resp)
+
+
+def read_tokens(resp):
     with resp as r:
         for raw in r:
             if not raw.strip():
@@ -470,16 +471,58 @@ def channel(messages, model):
                 raise RuntimeError(msg["error"])
             tok = msg.get("message", {}).get("content", "")
             if tok:
-                if first:
-                    sys.stdout.write("\r\033[K  " if TTY else "  ")
-                    first = False
-                    tok = tok.lstrip()
-                out.append(tok)
-                type_out(tok.replace("**", "").replace("\n", "\n  "), C.CYN)
+                yield tok
             if msg.get("done"):
                 break
+
+
+def channel(messages, model):
+    """Stream a reply from the local model, typewriter style. Returns the text."""
+    waiting = "  🕯  the duck is channeling..."
+    if TTY:
+        sys.stdout.write(f"{C.DIM}{waiting}{C.R}")
+        sys.stdout.flush()
+
+    def warn(text):
+        if TTY:
+            sys.stdout.write("\r\033[K")
+        print(f"  {C.YEL}⚠ {text}{C.R}")
+
+    out, first = [], True
+    for tok in open_channel(messages, model, warn):
+        if first:
+            sys.stdout.write("\r\033[K  " if TTY else "  ")
+            first = False
+            tok = tok.lstrip()
+        out.append(tok)
+        type_out(tok.replace("**", "").replace("\n", "\n  "), C.CYN)
     print()
     return "".join(out).strip()
+
+
+def exorcise_prompt(c, rel):
+    info = CURSES[c.kind]
+    return EXORCISE_TASK.format(
+        title=info["title"], kind=c.kind, note=f" — {c.note}" if c.note else "",
+        cure=info["fallback"], file=rel, line=c.line, context=c.context,
+        focus=c.focus)
+
+
+def possession(found):
+    return min(100, sum(c.severity for c in found) * 4)
+
+
+def debug_messages(file=None):
+    """The opening of a debugging séance, optionally with a file already read."""
+    messages = [{"role": "system", "content": PERSONA + DEBUG_TASK}]
+    if file:
+        code = Path(file).read_text(encoding="utf-8", errors="replace")
+        messages.append({"role": "user", "content":
+                         f"Here is the code I'm working on ({file}):\n```\n"
+                         f"{code[:12000]}\n```\nDon't solve it yet, just acknowledge it."})
+        messages.append({"role": "assistant", "content":
+                         "I have gazed upon your code. Now tell me what haunts it."})
+    return messages
 
 
 # --------------------------------------------------------------------------
@@ -507,8 +550,7 @@ def exorcise(args):
         type_out("  The duck will be watching.\n\n", C.DIM)
         return
 
-    score = sum(c.severity for c in found)
-    level = min(100, score * 4)
+    level = possession(found)
     bar = "█" * (level // 5) + "░" * (20 - level // 5)
     print(f"  {C.BOLD}Files sniffed:{C.R}    {files}")
     print(f"  {C.BOLD}Curses detected:{C.R}  {len(found)}")
@@ -542,13 +584,10 @@ def exorcise(args):
 
         text = None
         if not problem:
-            prompt = EXORCISE_TASK.format(
-                title=info["title"], kind=c.kind, note=f" — {c.note}" if c.note else "",
-                cure=info["fallback"], file=rel, line=c.line, context=c.context,
-                focus=c.focus)
             try:
                 text = channel([{"role": "system", "content": PERSONA},
-                                {"role": "user", "content": prompt}], args.model)
+                                {"role": "user", "content": exorcise_prompt(c, rel)}],
+                               args.model)
             except (urllib.error.URLError, OSError, RuntimeError) as e:
                 print(f"\n  {C.YEL}⚠ The connection to the beyond broke: {e}{C.R}")
         if text is None:
@@ -577,17 +616,22 @@ def exorcise(args):
 
 
 def write_report(out, root, files, found, level, report):
-    parts = [f"# Exorcism Report: `{root.name}`\n",
+    out.write_text(report_markdown(root.name, files, len(found), level, report),
+                   encoding="utf-8")
+
+
+def report_markdown(name, files, total, level, report):
+    parts = [f"# Exorcism Report: `{name}`\n",
              f"Performed by **Quackula**, the haunted rubber duck "
              f"({time.strftime('%Y-%m-%d %H:%M')}).\n",
-             f"- Files sniffed: {files}\n- Curses detected: {len(found)}\n"
+             f"- Files sniffed: {files}\n- Curses detected: {total}\n"
              f"- Possession level: {level}%\n"]
     for c, rel, title, text in report:
         parts.append(f"\n## {title}: `{rel}:{c.line}`\n")
         if c.note:
             parts.append(f"_{c.note}_\n")
         parts.append(f"\n```\n{c.snippet}\n```\n\n{text}\n")
-    out.write_text("".join(parts), encoding="utf-8")
+    return "".join(parts)
 
 
 def debug(args):
@@ -600,14 +644,8 @@ def debug(args):
     type_out("  Ah. A mortal with a bug. Sit. Speak. The duck is listening.\n", C.YEL)
     print(f"  {C.DIM}(type 'exit' to banish the duck){C.R}\n")
 
-    messages = [{"role": "system", "content": PERSONA + DEBUG_TASK}]
+    messages = debug_messages(args.file)
     if args.file:
-        code = Path(args.file).read_text(encoding="utf-8", errors="replace")
-        messages.append({"role": "user", "content":
-                         f"Here is the code I'm working on ({args.file}):\n```\n"
-                         f"{code[:12000]}\n```\nDon't solve it yet, just acknowledge it."})
-        messages.append({"role": "assistant", "content":
-                         "I have gazed upon your code. Now tell me what haunts it."})
         print(f"  {C.DIM}(the duck has read {args.file}){C.R}\n")
 
     while True:
@@ -654,11 +692,19 @@ def main():
     ex.add_argument("--report", help="write a markdown exorcism report to this file")
     db = sub.add_parser("debug", parents=[common], help="talk your bug through with the duck")
     db.add_argument("--file", help="let the duck read this file first")
+    ui = sub.add_parser("ui", parents=[common], help="open the séance room in your browser")
+    ui.add_argument("path", nargs="?", default=".", help="folder to pre-fill for exorcism")
+    ui.add_argument("--port", type=int, default=8666, help="local port (default 8666)")
+    ui.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
 
     args = parser.parse_args()
     if args.fast:
         TYPE_DELAY, DRAMA = 0, 0
     CPU_ONLY = args.cpu
+    if args.cmd == "ui":
+        from quackula_web import serve
+        serve(args)
+        return
     (exorcise if args.cmd == "exorcise" else debug)(args)
 
 

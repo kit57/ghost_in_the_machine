@@ -19,7 +19,21 @@ ollama pull gemma3:4b
 python quackula.py exorcise haunted_sample          # full theatrics
 python quackula.py exorcise path/to/repo --max 8 --report exorcism.md
 python quackula.py debug --file my_buggy_script.py
+python quackula.py ui                               # the séance room, in your browser
 ```
+
+### The séance room (web UI)
+
+Prefer clicking to typing? `python quackula.py ui [PATH]` opens a local web page
+that does everything the CLI does: sniff a folder for curses, exorcise them one
+at a time or all at once, download the exorcism report, and hold a debugging
+séance in a chat window. Every screen also shows the equivalent CLI command, so you
+can switch between the two whenever you like.
+
+The page is served only on `127.0.0.1` (default port 8666, change with `--port`;
+`--no-browser` skips opening a tab) and talks only to your local Ollama, so
+your code still never leaves your machine. It accepts the same `--model`,
+`--fast`, `--offline` and `--cpu` flags as starting defaults.
 
 Python 3.8+, standard library only. Options:
 
