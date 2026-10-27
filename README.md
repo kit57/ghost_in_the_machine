@@ -1,4 +1,4 @@
-# 🦆👻 Quackula — the haunted rubber duck
+# Quackula — the haunted rubber duck
 
 Quackula was a rubber duck on a programmer's desk from 1994 until it fell behind
 a radiator in 2009. Now it haunts codebases.
