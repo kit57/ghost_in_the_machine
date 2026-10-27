@@ -131,6 +131,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, {"error": "Nothing haunts this path."})
         if body.get("cpu"):
             q.CPU_ONLY = True
+        # The page may send before its model list has loaded.
+        body["model"] = body.get("model") or self.server.defaults["model"]
         route(body)
 
     def scan(self, body):

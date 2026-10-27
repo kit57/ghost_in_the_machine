@@ -323,6 +323,7 @@ function init(s) {
   ui.path.value = store.get('path') || s.path;
   ui.file.value = store.get('file') || '';
   updateCli();
+  updateChatAvailability();
 }
 
 function q(s) { return /[\s"']/.test(s) ? `"${s.replaceAll('"', '\\"')}"` : s; }

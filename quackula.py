@@ -29,7 +29,9 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+# 127.0.0.1, not localhost: on Windows "localhost" tries IPv6 first and stalls
+# ~2s per request before reaching Ollama, which only listens on IPv4.
+OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not OLLAMA.startswith("http"):
     OLLAMA = "http://" + OLLAMA
 DEFAULT_MODEL = os.environ.get("QUACKULA_MODEL", "gemma3:4b")
